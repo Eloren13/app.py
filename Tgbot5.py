@@ -4,6 +4,10 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from telegram.request import HTTPXRequest
 import httpx
+from keep_alive_ping import create_service
+
+# Создаем и запускаем сервис для поддержания жизни бота
+service = create_service(ping_interval=60)  # Пинг каждые 60 секунд
 
 # Настройка логирования
 logging.basicConfig(
