@@ -715,8 +715,7 @@ if "пифагор" in philosopher_key:
     keyboard_buttons.insert(0, [InlineKeyboardButton("🎬 Пифагорейская школа (видео)", url="https://youtu.be/Z1cCdiK8sIA")])
 elif philosopher_key.startswith(("фалес", "анаксимандр", "анаксимен")):
     keyboard_buttons.insert(0, [InlineKeyboardButton("🎬 Милетская школа (видео)", url="https://youtu.be/lt88jY2ljtY?si=DnK6u9ZUGX-l7776")])
-        
-            
+          
         keyboard = InlineKeyboardMarkup(keyboard_buttons)
         
         await update.message.reply_text(
