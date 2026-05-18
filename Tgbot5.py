@@ -701,21 +701,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🏠 Главное меню", callback_data='main_menu')]
         ]
         
-        # Добавляем кнопку с видео для милетской школы
-        philosopher_key = philosopher['name'].split()[0].lower()  # "фалес", "анаксимандр", "анаксимен"
-        video_links = {
-            "фалес": "https://youtu.be/lt88jY2ljtY?si=DnK6u9ZUGX-l7776",
-            "анаксимандр": "https://youtu.be/lt88jY2ljtY?si=DnK6u9ZUGX-l7776",
-            "анаксимен": "https://youtu.be/lt88jY2ljtY?si=DnK6u9ZUGX-l7776",
-            "пифагор": "https://youtu.be/Z1cCdiK8sIA",
-        }
+        # Добавляем кнопку с видео для милетской школы и пифагорейской школы
+        philosopher_lower = philosopher['name'].lower()
+        if "пифагор" in philosopher_lower:
+            keyboard_buttons.insert(0, [InlineKeyboardButton("🎬 Пифагорейская школа (видео)", url="https://youtu.be/Z1cCdiK8sIA")])
+        elif philosopher_lower.startswith(("фалес", "анаксимандр", "анаксимен")):
+            keyboard_buttons.insert(0, [InlineKeyboardButton("🎬 Милетская школа (видео)", url="https://youtu.be/lt88jY2ljtY?si=DnK6u9ZUGX-l7776")])
         
-        philosopher_key = philosopher['name'].lower()  # всё имя в нижнем регистре
-if "пифагор" in philosopher_key:
-    keyboard_buttons.insert(0, [InlineKeyboardButton("🎬 Пифагорейская школа (видео)", url="https://youtu.be/Z1cCdiK8sIA")])
-elif philosopher_key.startswith(("фалес", "анаксимандр", "анаксимен")):
-    keyboard_buttons.insert(0, [InlineKeyboardButton("🎬 Милетская школа (видео)", url="https://youtu.be/lt88jY2ljtY?si=DnK6u9ZUGX-l7776")])
-          
         keyboard = InlineKeyboardMarkup(keyboard_buttons)
         
         await update.message.reply_text(
@@ -723,7 +715,7 @@ elif philosopher_key.startswith(("фалес", "анаксимандр", "ана
             reply_markup=keyboard,
             parse_mode='HTML'
         )
-        return 
+        return
     
     # Если это не философ, ищем среди поэтов по имени
     poet_authors = [author for author in AUTHORS if author != "философы"]
