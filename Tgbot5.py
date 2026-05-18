@@ -323,7 +323,9 @@ def get_keyboard_for_author(author_key, context_type='author'):
         # Милетская школа
         "фалес": "https://youtu.be/lt88jY2ljtY?si=DnK6u9ZUGX-l7776",
         "анаксимандр": "https://youtu.be/lt88jY2ljtY?si=DnK6u9ZUGX-l7776",
-        "анаксимен": "https://youtu.be/lt88jY2ljtY?si=DnK6u9ZUGX-l7776"
+        "анаксимен": "https://youtu.be/lt88jY2ljtY?si=DnK6u9ZUGX-l7776",
+        # Пифагорейская школа 
+        "пифагор": "https://youtu.be/Z1cCdiK8sIA",
     }
     
     # Базовая клавиатура
@@ -704,12 +706,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         video_links = {
             "фалес": "https://youtu.be/lt88jY2ljtY?si=DnK6u9ZUGX-l7776",
             "анаксимандр": "https://youtu.be/lt88jY2ljtY?si=DnK6u9ZUGX-l7776",
-            "анаксимен": "https://youtu.be/lt88jY2ljtY?si=DnK6u9ZUGX-l7776"
+            "анаксимен": "https://youtu.be/lt88jY2ljtY?si=DnK6u9ZUGX-l7776",
+            "пифагор": "https://youtu.be/Z1cCdiK8sIA",
         }
         
         if philosopher_key in video_links:
             keyboard_buttons.insert(0, [InlineKeyboardButton(f"🎬 Милетская школа (видео)", url=video_links[philosopher_key])])
-        
+            keyboard_buttons.insert(0, [InlineKeyboardButton(f"🎬 Пифагорейская школа (видео)", url=video_links[philosopher_key])])
+            
         keyboard = InlineKeyboardMarkup(keyboard_buttons)
         
         await update.message.reply_text(
@@ -717,7 +721,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=keyboard,
             parse_mode='HTML'
         )
-        return  # Важно: этот return должен быть на том же уровне отступа, что и if philosopher
+        return 
     
     # Если это не философ, ищем среди поэтов по имени
     poet_authors = [author for author in AUTHORS if author != "философы"]
