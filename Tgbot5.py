@@ -710,9 +710,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "пифагор": "https://youtu.be/Z1cCdiK8sIA",
         }
         
-        if philosopher_key in video_links:
-            keyboard_buttons.insert(0, [InlineKeyboardButton(f"🎬 Милетская школа (видео)", url=video_links[philosopher_key])])
-            keyboard_buttons.insert(0, [InlineKeyboardButton(f"🎬 Пифагорейская школа (видео)", url=video_links[philosopher_key])])
+        philosopher_key = philosopher['name'].lower()  # всё имя в нижнем регистре
+if "пифагор" in philosopher_key:
+    keyboard_buttons.insert(0, [InlineKeyboardButton("🎬 Пифагорейская школа (видео)", url="https://youtu.be/Z1cCdiK8sIA")])
+elif philosopher_key.startswith(("фалес", "анаксимандр", "анаксимен")):
+    keyboard_buttons.insert(0, [InlineKeyboardButton("🎬 Милетская школа (видео)", url="https://youtu.be/lt88jY2ljtY?si=DnK6u9ZUGX-l7776")])
+        
             
         keyboard = InlineKeyboardMarkup(keyboard_buttons)
         
