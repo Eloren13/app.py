@@ -18,8 +18,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ID канала для проверки подписки
-CHANNEL_ID = '@Postuum'  # Замените на username вашего канала
-CHANNEL_LINK = 'https://t.me/Postuum'
+CHANNEL_ID = '@Postumm'  # Замените на username вашего канала
+CHANNEL_LINK = 'https://t.me/Postumm'
 CHANNEL_NAME = 'Постум'
 
 # ========== ФУНКЦИЯ ПРОВЕРКИ ПОДПИСКИ ==========
