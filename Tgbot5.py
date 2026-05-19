@@ -5,6 +5,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 from telegram.request import HTTPXRequest
 import httpx
 from keep_alive_ping import create_service
+from functools import wraps
 
 # Создаем и запускаем сервис для поддержания жизни бота
 service = create_service(ping_interval=60)  # Пинг каждые 60 секунд
@@ -16,6 +17,62 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ID канала для проверки подписки
+CHANNEL_ID = '@Postuum'  # Замените на username вашего канала
+CHANNEL_LINK = 'https://t.me/Postuum'
+CHANNEL_NAME = 'Постум'
+
+# ========== ФУНКЦИЯ ПРОВЕРКИ ПОДПИСКИ ==========
+async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """
+    Проверяет, подписан ли пользователь на канал
+    """
+    user_id = update.effective_user.id
+    
+    try:
+        chat_member = await context.bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
+        
+        if chat_member.status in ['member', 'creator', 'administrator']:
+            return True
+        else:
+            return False
+    except Exception as e:
+        logger.error(f"Ошибка при проверке подписки пользователя {user_id}: {e}")
+        return False
+
+# Декоратор для ограничения доступа только подписчикам
+def require_subscription(func):
+    """Декоратор для ограничения доступа к функциям только подписчикам"""
+    @wraps(func)
+    async def wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        is_subscribed = await check_subscription(update, context)
+        
+        if not is_subscribed:
+            # Для callback-запросов (нажатий на кнопки)
+            if update.callback_query:
+                await update.callback_query.answer()
+                await update.callback_query.message.reply_text(
+                    f"🔒 **Доступ ограничен**\n\n"
+                    f"Этот бот доступен только для подписчиков канала **{CHANNEL_NAME}**.\n\n"
+                    f"📢 **Подпишитесь на канал:** {CHANNEL_LINK}\n\n"
+                    f"После подписки нажмите /start, чтобы получить доступ к материалам.",
+                    parse_mode='Markdown',
+                    disable_web_page_preview=True
+                )
+            # Для обычных сообщений
+            elif update.message:
+                await update.message.reply_text(
+                    f"🔒 **Доступ ограничен**\n\n"
+                    f"Этот бот доступен только для подписчиков канала **{CHANNEL_NAME}**.\n\n"
+                    f"📢 **Подпишитесь на канал:** {CHANNEL_LINK}\n\n"
+                    f"После подписки нажмите /start, чтобы получить доступ к материалам.",
+                    parse_mode='Markdown',
+                    disable_web_page_preview=True
+                )
+            return
+        
+        return await func(update, context, *args, **kwargs)
+    return wrapped
 # База стихотворений с инициалами авторов
 POEMS = {
    "ахматова": {
@@ -685,6 +742,212 @@ def find_philosopher(query):
     
     return None
 
+# ========== ОБРАБОТЧИКИ С ПРОВЕРКОЙ ПОДПИСКИ ==========
+
+# Команда /start - с проверкой подписки
+@require_subscription
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    welcome_message = (
+        f"Привет, {user.first_name}! 👋\n\n"
+        "Спасибо, что подписались на канал **Постум**!\n\n"
+        "Я бот, который отправляет стихотворения и информацию об античных философах. Используй кнопки ниже для навигации:\n\n"
+        "🎲 **Случайное стихотворение** — каждый раз новый автор и новое стихотворение\n"
+        "📚 **Список авторов** — выбери конкретного поэта\n"
+        "🏛️ **Список античных философов** — выбери философа для получения информации\n"
+        "❓ **Помощь** — подсказка по использованию\n\n"
+        "🔍 **Поиск по ключевому слову** — просто напиши любое слово (например, «вечер»), и я буду показывать стихи с этим словом!"
+    )
+    
+    await update.message.reply_text(
+        welcome_message, 
+        reply_markup=get_main_keyboard(),
+        parse_mode='Markdown'
+    )
+
+# Обработка нажатий на кнопки - с проверкой подписки
+@require_subscription
+async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    chat_id = query.message.chat_id
+    
+    if query.data == 'random':
+        author_key = get_random_author_with_history(context, chat_id)
+        poem = get_random_poem(author_key, context, chat_id)
+        response = f"✍️ {POEMS[author_key]['name']}:\n\n{poem}"
+        
+        await query.message.reply_text(
+            response,
+            reply_markup=get_keyboard_for_author(author_key, context_type='random')
+        )
+    
+    elif query.data == 'authors':
+        authors_text = "📚 **Список доступных авторов:**\n\n"
+        poet_authors = [author for author in AUTHORS if author != "философы"]
+        for author_key in poet_authors:
+            authors_text += f"- {POEMS[author_key]['name']}\n"
+        
+        authors_text += "\nНажмите на кнопку с именем автора, чтобы получить его стихотворение!"
+        
+        await query.message.reply_text(
+            authors_text,
+            reply_markup=get_authors_keyboard_for_new_message(),
+            parse_mode='Markdown'
+        )
+    
+    elif query.data == 'philosophers_list':
+        philosophers_text = "🏛️ **Список античных философов:**\n\n"
+        
+        for i, philosopher in enumerate(PHILOSOPHERS, 1):
+            philosophers_text += f"{i}. {philosopher['name']}\n"
+        
+        philosophers_text += "\n📝 **Чтобы получить информацию о философе, напишите его имя или номер из списка!**\n\n"
+        philosophers_text += "Например: *Сократ* или *12*"
+        
+        keyboard = [
+            [InlineKeyboardButton("🏠 Главное меню", callback_data='main_menu')]
+        ]
+        
+        await query.message.reply_text(
+            philosophers_text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode='Markdown'
+        )
+    
+    elif query.data == 'help':
+        help_text = (
+            "🤖 **Как пользоваться ботом:**\n\n"
+            "• Нажмите 'Случайное стихотворение' для получения случайного стиха\n"
+            "• Выберите 'Список авторов' чтобы выбрать конкретного поэта\n"
+            "• Выберите 'Список античных философов' чтобы увидеть список философов, затем напишите имя или номер\n"
+            "• 🔍 **Поиск по ключевому слову** — просто напиши любое слово (например, «вечер»)\n"
+            "• Также вы можете просто написать имя автора (например, 'Пушкин')\n\n"
+            "**Доступные авторы:**\n"
+        )
+        
+        poet_authors = [author for author in AUTHORS if author != "философы"]
+        for author_key in poet_authors:
+            help_text += f"- {POEMS[author_key]['name']}\n"
+        
+        await query.message.reply_text(
+            help_text,
+            reply_markup=get_main_keyboard(),
+            parse_mode='Markdown'
+        )
+    
+    elif query.data == 'main_menu':
+        await query.message.reply_text(
+            "🏠 **Главное меню:**\n\nВыберите действие:",
+            reply_markup=get_main_keyboard(),
+            parse_mode='Markdown'
+        )
+    
+    elif query.data.startswith('author_'):
+        author_key = query.data.replace('author_', '')
+        author_info = POEMS[author_key]
+        
+        poem = get_random_poem(author_key, context, chat_id)
+        response = f"✍️ {author_info['name']}:\n\n{poem}"
+        
+        await query.message.reply_text(
+            response,
+            reply_markup=get_keyboard_for_author(author_key, context_type='author')
+        )
+
+# Обработка текстовых сообщений - с проверкой подписки
+@require_subscription
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_message = update.message.text.lower().strip()
+    chat_id = update.message.chat_id
+    
+    # Сначала проверяем, не ищет ли пользователь философа
+    philosopher = find_philosopher(user_message)
+    if philosopher:
+        response = f"🏛️ **{philosopher['name']}**\n\n{philosopher['info']}"
+        
+        keyboard_buttons = [
+            [InlineKeyboardButton("📋 Список философов", callback_data='philosophers_list')],
+            [InlineKeyboardButton("🏠 Главное меню", callback_data='main_menu')]
+        ]
+        
+        philosopher_lower = philosopher['name'].lower()
+        if "пифагор" in philosopher_lower:
+            keyboard_buttons.insert(0, [InlineKeyboardButton("🎬 Пифагорейская школа (видео)", url="https://youtu.be/Z1cCdiK8sIA")])
+        elif philosopher_lower.startswith(("фалес", "анаксимандр", "анаксимен")):
+            keyboard_buttons.insert(0, [InlineKeyboardButton("🎬 Милетская школа (видео)", url="https://youtu.be/lt88jY2ljtY?si=DnK6u9ZUGX-l7776")])
+        
+        keyboard = InlineKeyboardMarkup(keyboard_buttons)
+        
+        await update.message.reply_text(
+            response,
+            reply_markup=keyboard,
+            parse_mode='HTML'
+        )
+        return
+    
+    # Если это не философ, ищем среди поэтов по имени
+    poet_authors = [author for author in AUTHORS if author != "философы"]
+    for author_key in poet_authors:
+        if author_key in user_message or user_message == author_key:
+            author_info = POEMS[author_key]
+            
+            poem = get_random_poem(author_key, context, chat_id)
+            response = f"✍️ {author_info['name']}:\n\n{poem}"
+            
+            await update.message.reply_text(
+                response,
+                reply_markup=get_keyboard_for_author(author_key, context_type='author')
+            )
+            return
+    
+    # Если это не имя автора, ищем стихотворения по ключевому слову
+    author_key, poem_index, poem = get_random_poem_by_keyword(user_message, context, chat_id)
+    
+    if poem:
+        author_info = POEMS[author_key]
+        response = f"✍️ {author_info['name']}:\n\n{poem}"
+        
+        keyboard = [
+            [InlineKeyboardButton(f"🔄 Ещё с словом «{user_message}»", callback_data=f'keyword_{user_message}')],
+            [InlineKeyboardButton("🎲 Случайное стихотворение", callback_data='random')],
+            [InlineKeyboardButton("📚 Список авторов", callback_data='authors')]
+        ]
+        
+        await update.message.reply_text(
+            response,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    else:
+        await update.message.reply_text(
+            f"😕 Извините, я не нашел стихотворений со словом «{user_message}».\n"
+            "Попробуйте другое слово, имя автора или используйте кнопки ниже:",
+            reply_markup=get_main_keyboard()
+        )
+
+# Команда /help - с проверкой подписки
+@require_subscription
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    help_text = (
+        "🤖 **Как пользоваться ботом:**\n\n"
+        "• Нажмите 'Случайное стихотворение' для получения случайного стиха\n"
+        "• Выберите 'Список авторов' чтобы выбрать конкретного поэта\n"
+        "• Выберите 'Список античных философов' чтобы увидеть список философов, затем напишите имя или номер\n"
+        "• 🔍 **Поиск по ключевому слову** — просто напиши любое слово (например, «вечер»)\n"
+        "• Также вы можете просто написать имя автора (например, 'Пушкин')\n\n"
+        "**Доступные авторы:**\n"
+    )
+    
+    poet_authors = [author for author in AUTHORS if author != "философы"]
+    for author_key in poet_authors:
+        help_text += f"- {POEMS[author_key]['name']}\n"
+    
+    await update.message.reply_text(
+        help_text,
+        reply_markup=get_main_keyboard(),
+        parse_mode='Markdown'
+    )
+    
 # Обработка текстовых сообщений
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text.lower().strip()
